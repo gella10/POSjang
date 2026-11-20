@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { listCategories, createCategory, listMenu, createMenuItem, updateMenuItem } from "../controllers/menuController.js";
+import { authenticate, authorize } from "../middleware/auth.js";
+const router = Router();
+router.use(authenticate);
+router.get("/categories", listCategories);
+router.post("/categories", authorize("OWNER"), createCategory);
+router.get("/", listMenu);
+router.post("/", authorize("OWNER"), createMenuItem);
+router.patch("/:id", authorize("OWNER"), updateMenuItem);
+export default router;
