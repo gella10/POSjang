@@ -17,7 +17,7 @@ Backend API using Node.js, Express, PostgreSQL (`pg`), and JWT. This implementat
 4. Create tables:
       bash
    npm run db:init
-   ```
+
 5. Create the first OWNER account (see below).
 6. Start:
       bash
