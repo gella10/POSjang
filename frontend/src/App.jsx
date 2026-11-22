@@ -17,13 +17,14 @@ const photoFor = (m) => {
   if (m?.photo) return m.photo;
   if (m?.image) return m.image;
 
-  // Fallbacks for older products that do not yet have an assigned image.
+  // Older products that already have a photo in /img, matched by name.
   const n = (m?.name || "").toLowerCase();
-  return n.includes("bibimbap")
-    ? "/img/bibimbap.jpg"
-    : /spam|egg|musubi/.test(n)
-      ? "/img/spam.jpg"
-      : "/img/bulgogi.jpg";
+  if (n.includes("bibimbap")) return "/img/bibimbap.jpg";
+  if (/spam|egg|musubi/.test(n)) return "/img/spam.jpg";
+  if (n.includes("bulgogi")) return "/img/bulgogi.jpg";
+
+  // No photo provided: show the default placeholder.
+  return "/img/photonotavailable.jpg";
 };
 const iconPaths = {
   dashboard: (
@@ -445,7 +446,6 @@ const initialMenu = [
     category: "Noodles",
     price: 85,
     status: "Active",
-    stock: 32,
     image: "/img/jinramen_mild.jpg",
   },
   {
@@ -454,7 +454,6 @@ const initialMenu = [
     category: "Noodles",
     price: 85,
     status: "Active",
-    stock: 28,
     image: "/img/jinramen_spicy.jpg",
   },
   {
@@ -463,7 +462,6 @@ const initialMenu = [
     category: "Rice Meals",
     price: 180,
     status: "Active",
-    stock: 18,
   },
   {
     id: 4,
@@ -471,7 +469,6 @@ const initialMenu = [
     category: "Noodles",
     price: 100,
     status: "Active",
-    stock: 9,
     image: "/img/samyanghot_buldak.jpg",
   },
   {
@@ -480,7 +477,6 @@ const initialMenu = [
     category: "Noodles",
     price: 75,
     status: "Active",
-    stock: 15,
     image: "/img/cheese_ramen.jpg",
   },
   {
@@ -489,7 +485,6 @@ const initialMenu = [
     category: "Desserts",
     price: 105,
     status: "Active",
-    stock: 5,
     image: "/img/lecheflan.jpg",
   },
   {
@@ -498,7 +493,6 @@ const initialMenu = [
     category: "Snacks",
     price: 30,
     status: "Active",
-    stock: 12,
     image: "/img/tteokbokki.jpg",
   },
   {
@@ -507,15 +501,13 @@ const initialMenu = [
     category: "Rice Meals",
     price: 160,
     status: "Active",
-    stock: 20,
   },
   {
     id: 9,
-    name: "Spam Musubi",
-    category: "Snacks",
+    name: "Spam Bowl",
+    category: "Rice Meals",
     price: 95,
     status: "Active",
-    stock: 24,
   },
   {
     id: 10,
@@ -523,8 +515,28 @@ const initialMenu = [
     category: "Sides",
     price: 25,
     status: "Active",
-    stock: 40,
     image: "/img/kimchi.jpg",
+  },
+  {
+    id: 11,
+    name: "Cheese",
+    category: "Toppings",
+    price: 15,
+    status: "Active",
+  },
+  {
+    id: 12,
+    name: "Seaweed",
+    category: "Toppings",
+    price: 15,
+    status: "Active",
+  },
+  {
+    id: 13,
+    name: "Mikiki",
+    category: "Drinks",
+    price: 35,
+    status: "Active",
   },
 ];
 const initialStock = [
@@ -598,7 +610,7 @@ const sampleOrders = [
     id: "PM-1108-007",
     time: "2:20 PM",
     items: "3 items",
-    method: "E-wallet",
+    method: "G-Cash",
     amount: 315,
     status: "Paid",
   },
@@ -669,7 +681,7 @@ function MiniBars({ values, labels, highlight = -1 }) {
     </div>
   );
 }
-function Dashboard({ menu, orders, setPage }) {
+function Dashboard({ menu, orders, lowCount = 0, setPage }) {
   const bars = [22, 34, 48, 72, 91, 76, 98, 64, 45];
   const recent = orders.length ? orders.slice(0, 4) : sampleOrders;
   return (
@@ -705,7 +717,7 @@ function Dashboard({ menu, orders, setPage }) {
         />
         <Stat
           label="Low-stock items"
-          value="4"
+          value={String(lowCount)}
           hint="Check your inventory before the rush"
           icon="alert"
         />
@@ -871,7 +883,6 @@ function POSPage({ menu, setMenu, notify, onOrder }) {
     "Rice Meals",
     "Toppings",
     "Drinks",
-    "Take-out",
     "Snacks",
   ];
   const shown = menu.filter(
@@ -920,7 +931,6 @@ function POSPage({ menu, setMenu, notify, onOrder }) {
       <PageTitle
         title="What's the craving?"
         subtitle="Pick favorites, add to order, and make someone's day."
-        action={<span className="order-code">Order #PM-108 · {orderType}</span>}
       />
       <div className="pos-layout">
         <section className="pos-menu">
@@ -1044,28 +1054,13 @@ function POSPage({ menu, setMenu, notify, onOrder }) {
               ))
             )}
           </div>
-          <textarea
-            className="order-note"
-            rows="2"
-            placeholder="Add an order note (optional)"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
           <div className="order-total">
-            <div>
-              <span>Subtotal</span>
-              <b>{peso(total)}</b>
-            </div>
-            <div>
-              <span>Discount</span>
-              <b>{peso(0)}</b>
-            </div>
             <div className="grand-total">
               <span>Total</span>
               <strong>{peso(total)}</strong>
             </div>
             <div className="payment-choices">
-              {["Cash", "E-wallet"].map((p) => (
+              {["Cash", "G-Cash"].map((p) => (
                 <button
                   className={payment === p ? "active" : ""}
                   key={p}
@@ -1089,7 +1084,7 @@ function POSPage({ menu, setMenu, notify, onOrder }) {
   );
 }
 
-function MenuManagement({ menu, setMenu, notify }) {
+function MenuManagement({ menu, setMenu, setStock, notify }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All categories");
   const [status, setStatus] = useState("All status");
@@ -1121,10 +1116,37 @@ function MenuManagement({ menu, setMenu, notify }) {
               ...editing,
               id: Math.max(0, ...old.map((x) => x.id)) + 1,
               price: Number(editing.price),
-              stock: 0,
             },
           ],
     );
+    // A brand-new menu item is mirrored into inventory (starts at 0 on hand).
+    if (!editing.id) {
+      const unitFor = {
+        Noodles: "packs",
+        Toppings: "packs",
+        Drinks: "bottles",
+        Desserts: "pieces",
+        Snacks: "pieces",
+        "Rice Meals": "servings",
+        Sides: "servings",
+      };
+      const key = editing.name.trim().toLowerCase();
+      setStock((old) =>
+        old.some((x) => x.name.trim().toLowerCase() === key)
+          ? old
+          : [
+              ...old,
+              {
+                id: Math.max(0, ...old.map((x) => x.id)) + 1,
+                name: editing.name.trim(),
+                category: editing.category,
+                stock: 0,
+                unit: unitFor[editing.category] || "pieces",
+                threshold: 10,
+              },
+            ],
+      );
+    }
     setEditing(null);
     notify("Product saved.", "ok");
   };
@@ -1150,7 +1172,6 @@ function MenuManagement({ menu, setMenu, notify }) {
                 category: "Noodles",
                 price: "",
                 status: "Active",
-                stock: 0,
                 photo: "",
               })
             }
@@ -1191,7 +1212,6 @@ function MenuManagement({ menu, setMenu, notify }) {
                   <th>PRODUCT</th>
                   <th>CATEGORY</th>
                   <th>PRICE</th>
-                  <th>STOCK</th>
                   <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -1207,7 +1227,6 @@ function MenuManagement({ menu, setMenu, notify }) {
                     </td>
                     <td>{m.category}</td>
                     <td>{peso(m.price)}</td>
-                    <td>{m.stock}</td>
                     <td>
                       <button
                         className={`status-pill ${m.status.toLowerCase()}`}
@@ -1324,6 +1343,7 @@ function MenuManagement({ menu, setMenu, notify }) {
               <label>
                 Price (PHP)
                 <input
+                  className="price-input"
                   type="number"
                   min="0"
                   value={editing.price}
@@ -1379,7 +1399,7 @@ function MenuManagement({ menu, setMenu, notify }) {
                 {viewing.category} · {peso(viewing.price)}
               </p>
               <p>
-                Status: {viewing.status} · Stock: {viewing.stock}
+                Status: {viewing.status}
               </p>
             </section>
           </div>
@@ -1434,7 +1454,7 @@ function MenuManagement({ menu, setMenu, notify }) {
 
 function Inventory({ stock, setStock, notify }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("All statuses");
+  const [filter, setFilter] = useState("All status");
   const [viewing, setViewing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [adjust, setAdjust] = useState({
@@ -1452,7 +1472,7 @@ function Inventory({ stock, setStock, notify }) {
   const rows = stock.filter(
     (x) =>
       x.name.toLowerCase().includes(query.toLowerCase()) &&
-      (filter === "All statuses" || stateOf(x) === filter),
+      (filter === "All status" || stateOf(x) === filter),
   );
   const update = () => {
     const amount = Math.max(1, Number(adjust.quantity) || 1);
@@ -1520,7 +1540,7 @@ function Inventory({ stock, setStock, notify }) {
             <Dropdown
               value={filter}
               options={[
-                "All statuses",
+                "All status",
                 "Available",
                 "Low stock",
                 "Out of stock",
@@ -1537,7 +1557,7 @@ function Inventory({ stock, setStock, notify }) {
                   <th>UNIT</th>
                   <th>REORDER LEVEL</th>
                   <th>STATUS</th>
-                  <th></th>
+                  <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -2302,6 +2322,9 @@ function AccountDetails({ user, notify, avatar, setAvatar }) {
   );
 }
 
+const stockState = (x) =>
+  x.stock === 0 ? "Out of stock" : x.stock <= x.threshold ? "Low stock" : "Available";
+
 function Shell({ user, onLogout, notify }) {
   const [page, setPage] = useState("dashboard");
   const [menu, setMenu] = useState(initialMenu);
@@ -2310,6 +2333,33 @@ function Shell({ user, onLogout, notify }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [readNotice, setReadNotice] = useState(false);
+  const stockAlerts = stock.filter((x) => stockState(x) !== "Available");
+  // Every placed order deducts its items from inventory and flags new low / out-of-stock items.
+  const handleOrder = (o) => {
+    setOrders((old) => [o, ...old]);
+    const used = {};
+    (o.cart || []).forEach((c) => {
+      const k = c.name.trim().toLowerCase();
+      used[k] = (used[k] || 0) + c.qty;
+    });
+    const alerts = [];
+    const next = stock.map((x) => {
+      const q = used[x.name.trim().toLowerCase()];
+      if (!q) return x;
+      const updated = { ...x, stock: Math.max(0, x.stock - q) };
+      const after = stockState(updated);
+      if (after !== stockState(x) && after !== "Available")
+        alerts.push(
+          `${x.name} is now ${after.toLowerCase()} (${updated.stock} ${x.unit} left).`,
+        );
+      return updated;
+    });
+    setStock(next);
+    if (alerts.length) {
+      setReadNotice(false);
+      alerts.forEach((m) => notify(m, "error"));
+    }
+  };
   const avatarKey = `pj_avatar_${user.id || user.email || "user"}`;
   const [avatar, setAvatarState] = useState(() => {
     try {
@@ -2387,7 +2437,9 @@ function Shell({ user, onLogout, notify }) {
                 }}
               >
                 <Icon name="bell" />
-                {!readNotice && <i className="notification-dot" />}
+                {!readNotice && stockAlerts.length > 0 && (
+                  <i className="notification-dot" />
+                )}
               </button>
               {notificationsOpen && (
                 <div className="notification-dropdown">
@@ -2397,27 +2449,47 @@ function Shell({ user, onLogout, notify }) {
                       Mark all read
                     </button>
                   </div>
-                  <button
-                    className={`notice-item ${readNotice ? "read" : "unread"}`}
-                    onClick={() => {
-                      setReadNotice(true);
-                      setNotificationsOpen(false);
-                      setPage("inventory");
-                    }}
-                  >
-                    <span className="notice-icon">
-                      <Icon name="alert" size={16} />
-                    </span>
-                    <span>
-                      <b>Low stock alert</b>
-                      <small>
-                        Leche Flan is running low. Review your inventory.
-                      </small>
-                      <small className="notice-time">
-                        Just now · Click to view inventory
-                      </small>
-                    </span>
-                  </button>
+                  {stockAlerts.length === 0 ? (
+                    <div className="notice-item read">
+                      <span>
+                        <b>All stocked up</b>
+                        <small>No low-stock items right now.</small>
+                      </span>
+                    </div>
+                  ) : (
+                    stockAlerts.slice(0, 4).map((x) => (
+                      <button
+                        key={x.id}
+                        className={`notice-item ${readNotice ? "read" : "unread"}`}
+                        onClick={() => {
+                          setReadNotice(true);
+                          setNotificationsOpen(false);
+                          setPage("inventory");
+                        }}
+                      >
+                        <span className="notice-icon">
+                          <Icon name="alert" size={16} />
+                        </span>
+                        <span>
+                          <b>
+                            {x.stock === 0
+                              ? "Out of stock alert"
+                              : "Low stock alert"}
+                          </b>
+                          <small>
+                            {x.name}{" "}
+                            {x.stock === 0
+                              ? "is out of stock."
+                              : `is running low (${x.stock} ${x.unit} left).`}{" "}
+                            Review your inventory.
+                          </small>
+                          <small className="notice-time">
+                            Just now · Click to view inventory
+                          </small>
+                        </span>
+                      </button>
+                    ))
+                  )}
                   <div className="notification-footer">
                     <button
                       onClick={() => {
@@ -2487,18 +2559,28 @@ function Shell({ user, onLogout, notify }) {
           </div>
         </header>
         {page === "dashboard" && (
-          <Dashboard menu={menu} orders={orders} setPage={setPage} />
+          <Dashboard
+            menu={menu}
+            orders={orders}
+            lowCount={stockAlerts.length}
+            setPage={setPage}
+          />
         )}
         {page === "order" && (
           <POSPage
             menu={menu}
             setMenu={setMenu}
             notify={notify}
-            onOrder={(o) => setOrders((old) => [o, ...old])}
+            onOrder={handleOrder}
           />
         )}
         {page === "menu" && (
-          <MenuManagement menu={menu} setMenu={setMenu} notify={notify} />
+          <MenuManagement
+            menu={menu}
+            setMenu={setMenu}
+            setStock={setStock}
+            notify={notify}
+          />
         )}
         {page === "inventory" && (
           <Inventory stock={stock} setStock={setStock} notify={notify} />
