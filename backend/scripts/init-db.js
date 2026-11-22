@@ -6,7 +6,7 @@ import pool from "../src/config/db.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 try {
-  const sql = await fs.readFile(path.join(here, "../db/schema.sql"), "utf8");
+  const sql = await fs.readFile(path.join(here, "../../database/schema.sql"), "utf8");
   await pool.query(sql);
   console.log("Database schema initialized successfully.");
 } catch (error) {
